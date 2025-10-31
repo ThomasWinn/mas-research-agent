@@ -5,7 +5,13 @@ from typing import Any, Literal, TypedDict
 
 from langgraph.graph import END, StateGraph
 
-from .agents import EvaluatorAgent, PlannerAgent, ResearcherAgent, SynthesizerAgent
+from .agents import (
+    EvaluatorAgent,
+    PlannerAgent,
+    ResearcherAgent,
+    ResearchTeamAgent,
+    SynthesizerAgent,
+)
 from .config import Settings, settings
 from .memory import MemoryStore
 from .tools import SearchClient
@@ -35,7 +41,7 @@ class ResearchResult:
 
 def build_research_graph(
     planner: PlannerAgent,
-    researcher: ResearcherAgent,
+    researcher: ResearcherAgent | ResearchTeamAgent,
     synthesizer: SynthesizerAgent,
     evaluator: EvaluatorAgent | None = None,
 ) -> Any:
@@ -76,7 +82,6 @@ def run_research_workflow(
     )
 
     planner_model = _create_llm(cfg, temperature=0.2)
-    researcher_model = _create_llm(cfg, temperature=0.1)
     synthesizer_model = _create_llm(cfg, temperature=0.3)
     evaluator_model = _create_llm(cfg, temperature=0.0)
 
@@ -85,12 +90,95 @@ def run_research_workflow(
         memory=memory,
         max_subtopics=cfg.max_subtopics,
     )
-    researcher = ResearcherAgent(
-        researcher_model,
-        search_client=search_client,
-        memory=memory,
-        batch_size=cfg.researcher_batch_size,
-    )
+    researcher_profiles = [
+        {
+            "name": "scout-alpha",
+            "model": cfg.researcher_4bit_model,
+            "temperature": 0.15,
+            "system_prompt": (
+                "You are a fast-turnaround evidence scout using a compressed Qwen 7B model. "
+                "Stay grounded in the provided snippets and favor concise factual statements."
+            ),
+            "user_prompt": (
+                "Topic: {topic}\n"
+                "Sources:\n{sources}\n"
+                "Produce 3 short factual sentences with inline citations [1], [2], etc."
+            ),
+        },
+        {
+            "name": "scout-beta",
+            "model": cfg.researcher_4bit_model,
+            "temperature": 0.18,
+            "system_prompt": (
+                "You are a coverage-focused researcher operating on a 4-bit Qwen model. "
+                "Capture the biggest takeaways and surface divergent viewpoints without embellishment."
+            ),
+            "user_prompt": (
+                "Topic: {topic}\n"
+                "Sources:\n{sources}\n"
+                "Summarize the top findings in 3-5 sentences. Cite sources inline as [1], [2], etc."
+            ),
+        },
+        {
+            "name": "scout-gamma",
+            "model": cfg.researcher_4bit_model,
+            "temperature": 0.12,
+            "system_prompt": (
+                "You are a precision note-taker running on a lightweight Qwen configuration. "
+                "Prioritize crisp facts, statistics, and dates drawn directly from the snippets."
+            ),
+            "user_prompt": (
+                "Topic: {topic}\n"
+                "Sources:\n{sources}\n"
+                "List 3-4 key facts with inline citations [1], [2], etc."
+            ),
+        },
+        {
+            "name": "analyst-delta",
+            "model": cfg.researcher_8bit_model,
+            "temperature": 0.1,
+            "system_prompt": (
+                "You are a senior analyst with more capacity (8-bit Qwen). "
+                "Synthesize nuanced insights, note contradictions, and connect themes."
+            ),
+            "user_prompt": (
+                "Topic: {topic}\n"
+                "Sources:\n{sources}\n"
+                "Deliver a cohesive mini-brief (4-6 sentences) with inline citations, highlighting agreements or conflicts."
+            ),
+        },
+        {
+            "name": "analyst-epsilon",
+            "model": cfg.researcher_8bit_model,
+            "temperature": 0.08,
+            "system_prompt": (
+                "You are a verification-minded analyst operating on an 8-bit Qwen model. "
+                "Cross-check the evidence, call out uncertainties, and emphasize reliability."
+            ),
+            "user_prompt": (
+                "Topic: {topic}\n"
+                "Sources:\n{sources}\n"
+                "Write a cautious summary (4-5 sentences) that distinguishes well-supported facts from tentative items. "
+                "Use inline citations [1], [2], etc."
+            ),
+        },
+    ]
+    researcher_members = [
+        ResearcherAgent(
+            profile["name"],
+            llm=_create_llm(
+                cfg,
+                temperature=profile["temperature"],
+                model=profile["model"],
+            ),
+            search_client=search_client,
+            batch_size=cfg.researcher_batch_size,
+            system_prompt=profile["system_prompt"],
+            user_prompt=profile["user_prompt"],
+        )
+        for profile in researcher_profiles
+    ]
+    researcher = ResearchTeamAgent(researcher_members, memory=memory)
     synthesizer = SynthesizerAgent(
         synthesizer_model,
         memory=memory,
@@ -113,13 +201,13 @@ def run_research_workflow(
     return ResearchResult(state=final_state, memory=memory, graph=graph)
 
 
-def _create_llm(cfg: Settings, *, temperature: float) -> ChatOpenAI:
+def _create_llm(cfg: Settings, *, temperature: float, model: str | None = None) -> ChatOpenAI:
     if not cfg.openai_api_key:
         raise ValueError(
             "OPENAI_API_KEY not configured. Set it in your environment or a .env file."
         )
     return ChatOpenAI(
-        model=cfg.openai_model,
+        model=model or cfg.openai_model,
         temperature=temperature,
         api_key=cfg.openai_api_key,
     )

@@ -35,6 +35,8 @@ class Settings:
     tavily_api_key: str | None = field(default=None)
     max_subtopics: int = field(default=5)
     researcher_batch_size: int = field(default=3)
+    researcher_4bit_model: str = field(default="qwen2.5-7b-instruct-q4")
+    researcher_8bit_model: str = field(default="qwen2.5-7b-instruct-q8")
     enable_evaluator: bool = field(default=False)
 
     @classmethod
@@ -45,6 +47,8 @@ class Settings:
             tavily_api_key=os.getenv("TAVILY_API_KEY"),
             max_subtopics=_env_int("MAX_SUBTOPICS", 5),
             researcher_batch_size=_env_int("RESEARCHER_BATCH_SIZE", 3),
+            researcher_4bit_model=os.getenv("RESEARCHER_4BIT_MODEL", "qwen2.5-7b-instruct-q4"),
+            researcher_8bit_model=os.getenv("RESEARCHER_8BIT_MODEL", "qwen2.5-7b-instruct-q8"),
             enable_evaluator=_env_flag("ENABLE_EVALUATOR", False),
         )
 
