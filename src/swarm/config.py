@@ -37,6 +37,8 @@ class Settings:
     researcher_batch_size: int = field(default=3)
     researcher_4bit_model: str = field(default="qwen2.5-7b-instruct-q4")
     researcher_8bit_model: str = field(default="qwen2.5-7b-instruct-q8")
+    synth_eval_model: str = field(default="qwen2.5-32b-instruct-q4")
+    lm_studio_server: str | None = field(default=None)
     enable_evaluator: bool = field(default=False)
 
     @classmethod
@@ -49,6 +51,8 @@ class Settings:
             researcher_batch_size=_env_int("RESEARCHER_BATCH_SIZE", 3),
             researcher_4bit_model=os.getenv("RESEARCHER_4BIT_MODEL", "qwen2.5-7b-instruct-q4"),
             researcher_8bit_model=os.getenv("RESEARCHER_8BIT_MODEL", "qwen2.5-7b-instruct-q8"),
+            synth_eval_model=os.getenv("SYNTH_EVAL_4BIT_MODEL", "qwen2.5-32b-instruct-q4"),
+            lm_studio_server=os.getenv("LM_STUDIO_SERVER"),
             enable_evaluator=_env_flag("ENABLE_EVALUATOR", False),
         )
 

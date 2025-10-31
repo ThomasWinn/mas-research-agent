@@ -1,5 +1,6 @@
 from .planner import PlannerAgent
 from .researcher import ResearcherAgent, ResearchTeamAgent
+from .publisher import PublisherAgent
 from .synthesizer import SynthesizerAgent
 from .evaluator import EvaluatorAgent
 
@@ -8,5 +9,6 @@ __all__ = [
     "ResearcherAgent",
     "ResearchTeamAgent",
     "SynthesizerAgent",
+    "PublisherAgent",
     "EvaluatorAgent",
 ]

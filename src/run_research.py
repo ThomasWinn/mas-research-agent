@@ -74,6 +74,9 @@ def main() -> None:
         print("\n=== Critique ===")
         print(critique)
 
+    if report_path := state.get("report_path"):
+        print(f"\nMarkdown report saved to: {report_path}")
+
 
 if __name__ == "__main__":
     main()
